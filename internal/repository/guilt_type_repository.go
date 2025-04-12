@@ -1,9 +1,10 @@
 package repository
 
 import (
-	"gorm.io/gorm"
-	"guilt-type-service/internal/model"
 	"errors"
+	"guilt-type-service/internal/model"
+
+	"gorm.io/gorm"
 )
 
 type guiltTypeRepository struct {

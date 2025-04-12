@@ -1,29 +1,22 @@
-# Используем официальный образ Go для сборки
-FROM golang:1.19 as builder
+FROM golang:1.23.4
 
-# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
-# Копируем go.mod и go.sum для загрузки зависимостей
-COPY go.mod go.sum ./
-
-# Загружаем зависимости
+# Загрузка зависимостей
+COPY go.mod ./
+COPY go.sum ./
 RUN go mod download
 
-# Копируем остальные файлы проекта
+# Копирование проекта
 COPY . .
 
-# Собираем бинарный файл
-RUN go build -o main cmd/main.go
+# Скрипт ожидания базы
+#COPY wait-for-postgres.sh /wait-for-postgres.sh
+#RUN chmod +x /wait-for-postgres.sh
 
-# Используем минимальный образ для запуска
-FROM alpine:latest
+# Сборка
+RUN go build -o app ./cmd
 
-# Устанавливаем рабочую директорию
-WORKDIR /root/
+EXPOSE 8083
 
-# Копируем бинарный файл из предыдущего этапа
-COPY --from=builder /app/main .
-
-# Запускаем приложение
-CMD ["./main"]
+CMD [ "./app"]
