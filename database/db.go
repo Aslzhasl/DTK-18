@@ -1,19 +1,31 @@
 package database
 
 import (
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"fmt"
 	"log"
 	"os"
-	"guilt-type-service/internal/model"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func ConnectDB() *gorm.DB {
+func InitDB() *gorm.DB {
 	dsn := os.Getenv("DATABASE_URL")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Failed to connect to database: ", err)
+		log.Fatalf("failed to connect to database: %v", err)
 	}
-	db.AutoMigrate(&model.GuiltType{})
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to get database handle: %v", err)
+	}
+
+	// Ping
+	if err := sqlDB.Ping(); err != nil {
+		log.Fatalf("failed to ping database: %v", err)
+	}
+
+	fmt.Println("✅ Database connected")
 	return db
 }

@@ -1,14 +1,14 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
+	"encoding/json"
 	"net/http"
 	"strconv"
-	"guilt-type-service/internal/service"
-	"guilt-type-service/internal/model"
+
 	"guilt-type-service/internal/excel"
+	"guilt-type-service/internal/model"
 	"guilt-type-service/internal/repository"
-	"os"
+	"guilt-type-service/internal/service"
 )
 
 type GuiltTypeHandler struct {
@@ -20,67 +20,75 @@ func NewGuiltTypeHandler(s service.GuiltTypeService, r repository.GuiltTypeRepos
 	return &GuiltTypeHandler{service: s, repo: r}
 }
 
-func (h *GuiltTypeHandler) GetAll(c *gin.Context) {
-	res, err := h.service.GetAll()
+func (h *GuiltTypeHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	data, err := h.service.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusOK, res)
+	writeJSON(w, http.StatusOK, data)
 }
 
-func (h *GuiltTypeHandler) Create(c *gin.Context) {
+func (h *GuiltTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.GuiltType
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 	res, err := h.service.Create(req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	c.JSON(http.StatusOK, res)
+	writeJSON(w, http.StatusOK, res)
 }
 
-func (h *GuiltTypeHandler) Update(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+func (h *GuiltTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id") // you can use mux.Vars if using path params
+	id, _ := strconv.Atoi(idStr)
+
 	var req model.GuiltType
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
 		return
 	}
 	res, err := h.service.Update(uint(id), req)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	c.JSON(http.StatusOK, res)
+	writeJSON(w, http.StatusOK, res)
 }
 
-func (h *GuiltTypeHandler) Delete(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+func (h *GuiltTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, _ := strconv.Atoi(idStr)
+
 	err := h.service.Delete(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *GuiltTypeHandler) ImportExcel(c *gin.Context) {
-	filePath := c.Query("path")
+func (h *GuiltTypeHandler) ImportExcel(w http.ResponseWriter, r *http.Request) {
+	filePath := r.URL.Query().Get("path")
 	if filePath == "" {
 		filePath = "./data.xlsx"
 	}
-	if _, err := os.Stat(filePath); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Файл не найден"})
-		return
-	}
+
 	err := excel.ImportFromExcel(filePath, h.repo)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		http.Error(w, "Импорт не удался: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Импорт завершен"})
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Импорт завершен"})
+}
+
+// helper
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(data)
 }
